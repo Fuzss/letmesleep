@@ -9,7 +9,7 @@ import net.minecraftforge.fml.network.PacketDistributor;
 import net.minecraftforge.fml.network.simple.SimpleChannel;
 
 @SuppressWarnings("unused")
-public class NetworkHandler {
+public class OldNetworkHandler {
 
     private static final String PROTOCOL_VERSION = Integer.toString(1);
     private static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(

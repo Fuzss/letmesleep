@@ -23,7 +23,6 @@ public class ConfigBuildHandler {
         public final ForgeConfigSpec.BooleanValue setSpawnAlways;
         public final ForgeConfigSpec.BooleanValue spawnMonster;
         public final ForgeConfigSpec.IntValue spawnMonsterChance;
-        public final ForgeConfigSpec.BooleanValue doInsomnia;
 
         private GeneralConfig(String name) {
 
@@ -33,7 +32,6 @@ public class ConfigBuildHandler {
             this.setSpawnAlways = ConfigBuildHandler.BUILDER.comment("Disable to prevent setting a new respawn point when there is already one present at another bed. The other bed will have to be removed to set a new respawn point.").define("Always Set Spawn", true);
             this.spawnMonster = ConfigBuildHandler.BUILDER.comment("Spawn a monster and wake player when sleeping in an insufficiently lit area.").define("Spawn Monster", true);
             this.spawnMonsterChance = ConfigBuildHandler.BUILDER.comment("Chance to spawn a monster, higher numbers make it more likely to happen.").defineInRange("Spawn Monster Chance", 10, 0, Integer.MAX_VALUE);
-            this.doInsomnia = ConfigBuildHandler.BUILDER.comment("Add a game rule \"doInsomnia\" to disable phantom spawning during the night.").define("doInsomnia Game Rule", true);
 
             BUILDER.pop();
 

@@ -2,7 +2,7 @@ package com.fuzs.letmesleep.handler;
 
 import com.fuzs.letmesleep.helper.ReflectionHelper;
 import com.fuzs.letmesleep.helper.SetSpawnHelper;
-import com.fuzs.letmesleep.network.NetworkHandler;
+import com.fuzs.letmesleep.network.OldNetworkHandler;
 import com.fuzs.letmesleep.network.message.RequestSpawnMessage;
 import com.fuzs.letmesleep.util.SetSpawnPoint;
 import net.minecraft.client.Minecraft;
@@ -38,7 +38,7 @@ public class SetSpawnHandler {
         if (flag && evt.getPlayer().world.isRemote && evt.getNewSpawn() != null && evt.isForced()) {
 
             RequestSpawnMessage message = new RequestSpawnMessage(new RequestSpawnMessage.RequestSpawnMessageData(evt.getNewSpawn()));
-            NetworkHandler.sendToServer(message);
+            OldNetworkHandler.sendToServer(message);
 
         }
 
@@ -61,7 +61,7 @@ public class SetSpawnHandler {
                         new TranslationTextComponent("multiplayer.spawn.button").getFormattedText(), button -> {
                     button.visible = false;
                     RequestSpawnMessage message = new RequestSpawnMessage(new RequestSpawnMessage.RequestSpawnMessageData(pos));
-                    NetworkHandler.sendToServer(message);
+                    OldNetworkHandler.sendToServer(message);
                 });
 
                 evt.addWidget(setSpawn);
@@ -107,7 +107,7 @@ public class SetSpawnHandler {
                     ClientPlayerEntity player = this.mc.player;
                     player.getBedPosition().ifPresent(pos -> {
                         RequestSpawnMessage message = new RequestSpawnMessage(new RequestSpawnMessage.RequestSpawnMessageData(pos));
-                        NetworkHandler.sendToServer(message);
+                        OldNetworkHandler.sendToServer(message);
                         this.removeSpawnMessage();
                     });
 
