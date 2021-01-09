@@ -1,6 +1,7 @@
 package com.fuzs.letmesleep.handler;
 
 import com.fuzs.letmesleep.helper.ReflectionHelper;
+import net.minecraft.block.BlockBed;
 import net.minecraft.block.BlockHorizontal;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
@@ -66,6 +67,9 @@ public class BadDreamHandler {
             int i = 0;
             boolean flag1 = false;
             BlockPos bedPos = player.bedLocation;
+            if (!(world.getBlockState(bedPos).getBlock() instanceof BlockBed)) {
+                continue;
+            }
 
             while (i < difficulty * ConfigBuildHandler.generalConfig.spawnMonsterChance && !flag1) {
 

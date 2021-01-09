@@ -20,8 +20,7 @@ import org.apache.logging.log4j.Logger;
         name = LetMeSleep.NAME,
         version = LetMeSleep.VERSION,
         acceptedMinecraftVersions = LetMeSleep.RANGE,
-        dependencies = LetMeSleep.DEPENDENCIES,
-        certificateFingerprint = LetMeSleep.FINGERPRINT
+        dependencies = LetMeSleep.DEPENDENCIES
 )
 @Mod.EventBusSubscriber(modid = LetMeSleep.MODID)
 @SuppressWarnings({"WeakerAccess", "unused"})
@@ -29,12 +28,11 @@ public class LetMeSleep {
 
     public static final String MODID = "letmesleep";
     public static final String NAME = "Let Me Sleep";
-    public static final String VERSION = "@VERSION@";
+    public static final String VERSION = "1.2.2";
     public static final String RANGE = "[1.12.2]";
     public static final String DEPENDENCIES = "required-after:forge@[14.23.5.2779,)";
     public static final String CLIENT_PROXY_CLASS = "com.fuzs.letmesleep.proxy.ClientProxy";
     public static final String SERVER_PROXY_CLASS = "com.fuzs.letmesleep.proxy.ServerProxy";
-    public static final String FINGERPRINT = "@FINGERPRINT@";
 
     public static final Logger LOGGER = LogManager.getLogger(LetMeSleep.NAME);
 
@@ -53,13 +51,6 @@ public class LetMeSleep {
     public void onPostInit(FMLPostInitializationEvent evt) {
 
         proxy.onClientSetup();
-
-    }
-
-    @EventHandler
-    public void onFingerprintViolation(FMLFingerprintViolationEvent evt) {
-
-        LOGGER.warn("Invalid fingerprint detected! The file " + evt.getSource().getName() + " may have been tampered with. This version will NOT be supported by the author!");
 
     }
 

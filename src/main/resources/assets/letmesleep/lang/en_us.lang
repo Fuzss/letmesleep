@@ -1,6 +1,6 @@
 block.minecraft.bed.obstructed=This bed is obstructed
-block.minecraft.bed.no_sleep.short_message=You can sleep only %s
-block.minecraft.bed.no_sleep.long_message=You can sleep only %s and %s
+block.minecraft.bed.no_sleep.short_message=You can only sleep %s
+block.minecraft.bed.no_sleep.long_message=You can only sleep %s and %s
 block.minecraft.bed.no_sleep.night=at night
 block.minecraft.bed.no_sleep.time=from %s to %s
 block.minecraft.bed.no_sleep.thunder=during thunderstorms

@@ -40,7 +40,7 @@ public class CommonEventHandler {
 
         if (flag && evt.getNewSpawn() != null && !evt.getNewSpawn().equals(player.getBedLocation(player.dimension))) {
 
-            player.sendStatusMessage(new TextComponentTranslation("block.minecraft.bed.spawn_set"), true);
+            player.sendStatusMessage(new TextComponentTranslation("block.minecraft.bed.spawn_set"), false);
 
         }
 

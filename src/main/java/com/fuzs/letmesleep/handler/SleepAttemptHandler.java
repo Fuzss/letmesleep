@@ -40,17 +40,8 @@ public class SleepAttemptHandler {
 
         if (!world.isRemote) {
 
-            boolean modified = evt.getResultStatus() != null;
-
-            if (SetSpawnHelper.isNewSpawnAllowed(world, player, at, SetSpawnPoint.INTERACT) && !player.isSneaking()) {
-                player.setSpawnPoint(at, false);
-                if (!modified) {
-                    evt.setResult(EntityPlayer.SleepResult.OTHER_PROBLEM);
-                }
-                return;
-            }
-
-            if (modified) {
+            // another mod changed the result
+            if (evt.getResultStatus() != null) {
                 return;
             }
 
@@ -64,12 +55,6 @@ public class SleepAttemptHandler {
                 return;
             }
 
-            if (!net.minecraftforge.event.ForgeEventFactory.fireSleepingTimeCheck(player, at)) {
-                this.sendNotPossibleNowMessage(player);
-                evt.setResult(EntityPlayer.SleepResult.OTHER_PROBLEM);
-                return;
-            }
-
             if (ConfigBuildHandler.sleepConfig.rangeCheck && !this.bedInRange(player, at, facing)) {
                 evt.setResult(EntityPlayer.SleepResult.TOO_FAR_AWAY);
                 return;
@@ -77,6 +62,16 @@ public class SleepAttemptHandler {
 
             if (ConfigBuildHandler.sleepConfig.obstructionCheck && facing != null && this.bedObstructed(player, at, facing)) {
                 player.sendStatusMessage(new TextComponentTranslation("block.minecraft.bed.obstructed"), true);
+                evt.setResult(EntityPlayer.SleepResult.OTHER_PROBLEM);
+                return;
+            }
+
+            if (SetSpawnHelper.isNewSpawnAllowed(world, player, at, SetSpawnPoint.INTERACT) && !player.isSneaking()) {
+                player.setSpawnPoint(at, false);
+            }
+
+            if (!net.minecraftforge.event.ForgeEventFactory.fireSleepingTimeCheck(player, at)) {
+                this.sendNotPossibleNowMessage(player);
                 evt.setResult(EntityPlayer.SleepResult.OTHER_PROBLEM);
                 return;
             }
