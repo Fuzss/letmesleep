@@ -6,9 +6,9 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -78,19 +78,23 @@ public abstract class ElementRegistry {
     /**
      * generate general config section for controlling elements, setup individual config sections and collect events to be registered in {@link #load}
      */
-    public static void setup() {
+    protected static void setup() {
 
-        Set<AbstractElement> elements = getOwnElements();
-        ConfigManager.builder().create("general", builder -> elements.forEach(element -> element.setupGeneralConfig(builder)), getSide(elements));
-        elements.forEach(AbstractElement::setup);
+        Map<ResourceLocation, AbstractElement> elements = getOwnElements();
+        ConfigManager.builder().create("general", builder -> elements.values().forEach(element -> element.setupGeneralConfig(builder)), getSide(elements.values()));
+        elements.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getValue, entry -> entry.getKey().getPath()))
+                .forEach(AbstractElement::setup);
     }
 
     /**
      * @return elements for active mod container as set
      */
-    private static Set<AbstractElement> getOwnElements() {
+    private static Map<ResourceLocation, AbstractElement> getOwnElements() {
 
-        return ELEMENTS.entrySet().stream().filter(entry -> entry.getKey().getNamespace().equals(getActiveNamespace())).map(Map.Entry::getValue).collect(Collectors.toSet());
+        return ELEMENTS.entrySet().stream()
+                .filter(entry -> entry.getKey().getNamespace().equals(getActiveNamespace()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     /**
@@ -134,17 +138,23 @@ public abstract class ElementRegistry {
      * finds the main side this mod is running on, usually {@link net.minecraftforge.fml.config.ModConfig.Type#COMMON}
      * @return main side
      */
-    private static ModConfig.Type getSide(Set<AbstractElement> elements) {
+    private static ModConfig.Type getSide(Collection<AbstractElement> elements) {
 
-        if (elements.stream().allMatch(element -> element instanceof ISidedElement.Client)) {
+        if (!elements.isEmpty()) {
 
-            return ModConfig.Type.CLIENT;
-        } else if (elements.stream().allMatch(element -> element instanceof ISidedElement.Server)) {
+            if (elements.stream().anyMatch(element -> element instanceof ISidedElement.Common)) {
 
-            return ModConfig.Type.SERVER;
+                return ModConfig.Type.COMMON;
+            } else if (elements.stream().allMatch(element -> element instanceof ISidedElement.Client)) {
+
+                return ModConfig.Type.CLIENT;
+            } else if (elements.stream().allMatch(element -> element instanceof ISidedElement.Server)) {
+
+                return ModConfig.Type.SERVER;
+            }
         }
 
-        return ModConfig.Type.COMMON;
+        throw new RuntimeException("Mod has no elements");
     }
 
     /**

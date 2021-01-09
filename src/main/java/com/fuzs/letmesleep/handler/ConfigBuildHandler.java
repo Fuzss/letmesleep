@@ -46,7 +46,6 @@ public class ConfigBuildHandler {
         public final ForgeConfigSpec.BooleanValue bedtimeThunder;
         public final ForgeConfigSpec.BooleanValue bedtimeRain;
         public final ForgeConfigSpec.BooleanValue timeTwelve;
-        public final ForgeConfigSpec.BooleanValue timeClock;
         public final ForgeConfigSpec.BooleanValue instantSleeping;
         public final ForgeConfigSpec.IntValue wakeUpTime;
 
@@ -59,7 +58,6 @@ public class ConfigBuildHandler {
             this.bedtimeThunder = ConfigBuildHandler.BUILDER.comment("Is going to bed during a thunderstorm permitted.").define("Sleep During Thunder", true);
             this.bedtimeRain = ConfigBuildHandler.BUILDER.comment("Is going to bed when it's raining permitted.").define("Sleep During Rain", false);
             this.timeTwelve = ConfigBuildHandler.BUILDER.comment("Use 12h format for status messages.").define("Time 12h Format", false);
-            this.timeClock = ConfigBuildHandler.BUILDER.comment("Add current time to the clock item tooltip.").define("Clock Time Tooltip", true);
             this.instantSleeping = ConfigBuildHandler.BUILDER.comment("Removes the falling asleep animation, so you wake up instantly after going to bed. Some options from \"Set Respawn Point\" will no longer be accessible then.").define("Instant Sleeping", false);
             this.wakeUpTime = ConfigBuildHandler.BUILDER.comment("Time set after sleeping successfully.").defineInRange("Wake Up Time", 0, 0, 24000);
 

@@ -9,13 +9,17 @@ import net.minecraftforge.eventbus.api.Cancelable;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.registries.IForgeRegistry;
 import net.minecraftforge.registries.IForgeRegistryEntry;
 
+import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * all features a mod adds are structured into elements which are then registered, this is an abstract version
@@ -30,6 +34,16 @@ public abstract class AbstractElement implements IConfigurableElement {
      * is this element enabled (are events registered)
      */
     private boolean enabled;
+    /**
+     * handler for client operations
+     */
+    @Nullable
+    private ISidedElement.Client clientPerformer;
+    /**
+     * handler for server operations
+     */
+    @Nullable
+    private ISidedElement.Server serverPerformer;
 
     @Override
     public final void setupGeneralConfig(ForgeConfigSpec.Builder builder) {
@@ -39,26 +53,80 @@ public abstract class AbstractElement implements IConfigurableElement {
 
     /**
      * build element config and get event listeners
+     * @param elementId id of this element for config section
      */
-    public final void setup() {
+    public final void setup(String elementId) {
+
+        this.setupPerformers();
+        this.setupConfig(elementId);
+        this.setup(ISidedElement.Common::setupCommon, ISidedElement.Client::setupClient, ISidedElement.Server::setupServer);
+    }
+
+    /**
+     * create performer for physical side
+     */
+    private void setupPerformers() {
+
+        if (FMLEnvironment.dist.isDedicatedServer()) {
+
+            Optional.ofNullable(this.createServerPerformer()).map(performer -> performer.apply(this)).ifPresent(performer -> {
+
+                if (performer instanceof ISidedElement.Server) {
+
+                    this.serverPerformer = (ISidedElement.Server) performer;
+                } else {
+
+                    throw new RuntimeException("Performer does not implement ISidedElement.Server");
+                }
+            });
+        } else {
+
+            Optional.ofNullable(this.createClientPerformer()).map(performer -> performer.apply(this)).ifPresent(performer -> {
+
+                if (performer instanceof ISidedElement.Client) {
+
+                    this.clientPerformer = (ISidedElement.Client) performer;
+                } else {
+
+                    throw new RuntimeException("Performer does not implement ISidedElement.Client");
+                }
+            });
+        }
+    }
+
+    /**
+     * @param commonSetup consumer if implements {@link com.fuzs.puzzleslib.element.ISidedElement.Common}
+     * @param clientSetup consumer if implements {@link com.fuzs.puzzleslib.element.ISidedElement.Client}
+     * @param serverSetup consumer if implements {@link com.fuzs.puzzleslib.element.ISidedElement.Server}
+     */
+    private void setup(Consumer<ISidedElement.Common> commonSetup, Consumer<ISidedElement.Client> clientSetup, Consumer<ISidedElement.Server> serverSetup) {
 
         if (this instanceof ISidedElement.Common) {
 
-            ConfigManager.builder().create(this.getDisplayName(), ((ISidedElement.Common) this)::setupCommonConfig, ModConfig.Type.COMMON);
-            ((ISidedElement.Common) this).setupCommon();
+            commonSetup.accept(((ISidedElement.Common) this));
         }
 
         if (this instanceof ISidedElement.Client) {
 
-            ConfigManager.builder().create(this.getDisplayName(), ((ISidedElement.Client) this)::setupClientConfig, ModConfig.Type.CLIENT);
-            ((ISidedElement.Client) this).setupClient();
+            clientSetup.accept(((ISidedElement.Client) this));
         }
 
         if (this instanceof ISidedElement.Server) {
 
-            ConfigManager.builder().create(this.getDisplayName(), ((ISidedElement.Server) this)::setupServerConfig, ModConfig.Type.SERVER);
-            ((ISidedElement.Server) this).setupServer();
+            serverSetup.accept(((ISidedElement.Server) this));
         }
+    }
+
+    /**
+     * setup config for all sides
+     * @param elementId id of this element for config section
+     */
+    private void setupConfig(String elementId) {
+
+        Consumer<ISidedElement.Common> commonSetup = element -> ConfigManager.builder().create(elementId, element::setupCommonConfig, ModConfig.Type.COMMON);
+        Consumer<ISidedElement.Client> clientSetup = element -> ConfigManager.builder().create(elementId, element::setupClientConfig, ModConfig.Type.CLIENT);
+        Consumer<ISidedElement.Server> serverSetup = element -> ConfigManager.builder().create(elementId, element::setupServerConfig, ModConfig.Type.SERVER);
+        this.setup(commonSetup, clientSetup, serverSetup);
     }
 
     /**
@@ -114,12 +182,52 @@ public abstract class AbstractElement implements IConfigurableElement {
     }
 
     /**
+     * @return handler for client side
+     */
+    @Nullable
+    protected Function<AbstractElement, ISidedElement.Abstract> createClientPerformer() {
+
+        return null;
+    }
+
+    /**
+     * @return handler for server side
+     */
+    @Nullable
+    protected Function<AbstractElement, ISidedElement.Abstract> createServerPerformer() {
+
+        return null;
+    }
+
+    /**
+     * @param consumer action to perform on {@link #clientPerformer}
+     */
+    protected final void performForClient(Consumer<ISidedElement.Client> consumer) {
+
+        if (this.clientPerformer != null) {
+
+            consumer.accept(this.clientPerformer);
+        }
+    }
+
+    /**
+     * @param consumer action to perform on {@link #serverPerformer}
+     */
+    protected final void performForServer(Consumer<ISidedElement.Server> consumer) {
+
+        if (this.serverPerformer != null) {
+
+            consumer.accept(this.serverPerformer);
+        }
+    }
+
+    /**
      * @param entry config entry to add
      * @param action consumer for updating value when changed
      * @param <S> type of config value
      * @param <T> field type
      */
-    protected static <S extends ForgeConfigSpec.ConfigValue<T>, T> void addToConfig(S entry, Consumer<T> action) {
+    public static <S extends ForgeConfigSpec.ConfigValue<T>, T> void addToConfig(S entry, Consumer<T> action) {
 
         ConfigManager.get().registerEntry(entry, action);
     }
@@ -131,7 +239,7 @@ public abstract class AbstractElement implements IConfigurableElement {
      * @param <T> type of registry
      * @return deserialized data as set
      */
-    protected <T extends IForgeRegistryEntry<T>> Set<T> deserializeToSet(List<String> data, IForgeRegistry<T> registry) {
+    public static <T extends IForgeRegistryEntry<T>> Set<T> deserializeToSet(List<String> data, IForgeRegistry<T> registry) {
 
         return new EntryCollectionBuilder<>(registry).buildEntrySet(data);
     }
@@ -143,7 +251,7 @@ public abstract class AbstractElement implements IConfigurableElement {
      * @param <T> type of registry
      * @return deserialized data as map
      */
-    protected <T extends IForgeRegistryEntry<T>> Map<T, Double> deserializeToMap(List<String> data, IForgeRegistry<T> registry) {
+    public static <T extends IForgeRegistryEntry<T>> Map<T, double[]> deserializeToMap(List<String> data, IForgeRegistry<T> registry) {
 
         return new EntryCollectionBuilder<>(registry).buildEntryMap(data);
     }
@@ -153,7 +261,7 @@ public abstract class AbstractElement implements IConfigurableElement {
      * @param consumer Callback to invoke when a matching event is received
      * @param <T> The {@link Event} subclass to listen for
      */
-    protected final <T extends Event> void addListener(Consumer<T> consumer) {
+    public final <T extends Event> void addListener(Consumer<T> consumer) {
 
         this.addListener(consumer, EventPriority.NORMAL);
     }
@@ -164,7 +272,7 @@ public abstract class AbstractElement implements IConfigurableElement {
      * @param receiveCancelled Indicate if this listener should receive events that have been {@link Cancelable} cancelled
      * @param <T> The {@link Event} subclass to listen for
      */
-    protected final <T extends Event> void addListener(Consumer<T> consumer, boolean receiveCancelled) {
+    public final <T extends Event> void addListener(Consumer<T> consumer, boolean receiveCancelled) {
 
         this.addListener(consumer, EventPriority.NORMAL, receiveCancelled);
     }
@@ -175,7 +283,7 @@ public abstract class AbstractElement implements IConfigurableElement {
      * @param priority {@link EventPriority} for this listener
      * @param <T> The {@link Event} subclass to listen for
      */
-    protected final <T extends Event> void addListener(Consumer<T> consumer, EventPriority priority) {
+    public final <T extends Event> void addListener(Consumer<T> consumer, EventPriority priority) {
 
         this.addListener(consumer, priority, false);
     }
@@ -187,7 +295,7 @@ public abstract class AbstractElement implements IConfigurableElement {
      * @param receiveCancelled Indicate if this listener should receive events that have been {@link Cancelable} cancelled
      * @param <T> The {@link Event} subclass to listen for
      */
-    protected final <T extends Event> void addListener(Consumer<T> consumer, EventPriority priority, boolean receiveCancelled) {
+    public final <T extends Event> void addListener(Consumer<T> consumer, EventPriority priority, boolean receiveCancelled) {
 
         this.events.add(new EventStorage<>(consumer, priority, receiveCancelled));
     }

@@ -94,4 +94,20 @@ public interface ISidedElement {
 
     }
 
+    class Abstract {
+
+        private final AbstractElement parent;
+
+        public Abstract(AbstractElement parent) {
+
+            this.parent = parent;
+        }
+
+        public AbstractElement getParent() {
+
+            return this.parent;
+        }
+
+    }
+
 }

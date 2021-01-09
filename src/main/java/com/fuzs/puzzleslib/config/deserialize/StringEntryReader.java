@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
  * parser logic for collection builder
  * @param <T> content type of collection to build
  */
-public abstract class StringListParser<T extends IForgeRegistryEntry<T>> {
+public class StringEntryReader<T extends IForgeRegistryEntry<T>> {
 
     /**
      * registry to work with
@@ -23,7 +23,7 @@ public abstract class StringListParser<T extends IForgeRegistryEntry<T>> {
     /**
      * @param registry registry entries the to be created collections contain
      */
-    protected StringListParser(IForgeRegistry<T> registry) {
+    protected StringEntryReader(IForgeRegistry<T> registry) {
         
         this.activeRegistry = registry;
     }

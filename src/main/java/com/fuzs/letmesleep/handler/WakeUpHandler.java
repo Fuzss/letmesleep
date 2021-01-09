@@ -1,29 +1,18 @@
 package com.fuzs.letmesleep.handler;
 
-import com.fuzs.letmesleep.LetMeSleep;
-import com.fuzs.letmesleep.helper.ClearPotionsHelper;
-import com.fuzs.letmesleep.util.ClearPotions;
 import com.fuzs.letmesleep.util.SetSpawnPoint;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.ServerPlayerEntity;
-import net.minecraft.potion.Effect;
 import net.minecraft.potion.EffectInstance;
-import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.server.ServerWorld;
 import net.minecraftforge.event.entity.player.PlayerWakeUpEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.registries.ForgeRegistries;
-
-import java.util.List;
-import java.util.Optional;
 
 public class WakeUpHandler {
 
-    @SuppressWarnings({"unused", "deprecation", "ConstantConditions"})
     @SubscribeEvent
     public void onPlayerWake(PlayerWakeUpEvent evt) {
 
@@ -58,45 +47,45 @@ public class WakeUpHandler {
 
             }
 
-            if (evt.shouldSetSpawn() && !evt.wakeImmediately() && !evt.updateWorld()) {
-
-                if (ConfigBuildHandler.WAKE_UP_CONFIG.heal.get()) {
-
-                    int i = ConfigBuildHandler.WAKE_UP_CONFIG.healAmount.get();
-                    player.heal(i == 0 ? player.getMaxHealth() : i);
-
-                }
-
-                if (ConfigBuildHandler.WAKE_UP_CONFIG.starve.get()) {
-
-                    int j = ConfigBuildHandler.WAKE_UP_CONFIG.starveAmount.get();
-                    int k = player.getFoodStats().getFoodLevel();
-                    player.getFoodStats().setFoodLevel(MathHelper.clamp(k - (j == 0 ? k : j), 0, 20));
-
-                }
-
-                ClearPotions clearPotions = ConfigBuildHandler.WAKE_UP_CONFIG.clearPotions.get();
-                if (clearPotions == ClearPotions.BOTH) {
-
-                    player.clearActivePotions();
-
-                } else if (clearPotions == ClearPotions.POSITIVE) {
-
-                    ClearPotionsHelper.clearActivePotions(player, true);
-
-                } else if (clearPotions == ClearPotions.NEGATIVE) {
-
-                    ClearPotionsHelper.clearActivePotions(player, false);
-
-                }
-
-                if (ConfigBuildHandler.WAKE_UP_CONFIG.effects.get()) {
-
-                    this.applyPotions(player);
-
-                }
-
-            }
+//            if (evt.shouldSetSpawn() && !evt.wakeImmediately() && !evt.updateWorld()) {
+//
+//                if (ConfigBuildHandler.WAKE_UP_CONFIG.heal.get()) {
+//
+//                    int i = ConfigBuildHandler.WAKE_UP_CONFIG.healAmount.get();
+//                    player.heal(i == 0 ? player.getMaxHealth() : i);
+//
+//                }
+//
+//                if (ConfigBuildHandler.WAKE_UP_CONFIG.starve.get()) {
+//
+//                    int j = ConfigBuildHandler.WAKE_UP_CONFIG.starveAmount.get();
+//                    int k = player.getFoodStats().getFoodLevel();
+//                    player.getFoodStats().setFoodLevel(MathHelper.clamp(k - (j == 0 ? k : j), 0, 20));
+//
+//                }
+//
+//                ClearPotions clearPotions = ConfigBuildHandler.WAKE_UP_CONFIG.clearPotions.get();
+//                if (clearPotions == ClearPotions.BOTH) {
+//
+//                    player.clearActivePotions();
+//
+//                } else if (clearPotions == ClearPotions.POSITIVE) {
+//
+//                    ClearPotionsHelper.clearActivePotions(player, true);
+//
+//                } else if (clearPotions == ClearPotions.NEGATIVE) {
+//
+//                    ClearPotionsHelper.clearActivePotions(player, false);
+//
+//                }
+//
+//                if (ConfigBuildHandler.WAKE_UP_CONFIG.effects.get()) {
+//
+//                    this.applyPotions(player);
+//
+//                }
+//
+//            }
 
         }
 

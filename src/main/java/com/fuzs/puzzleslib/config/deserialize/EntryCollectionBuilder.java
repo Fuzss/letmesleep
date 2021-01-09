@@ -5,7 +5,9 @@ import com.google.common.collect.Sets;
 import net.minecraftforge.registries.IForgeRegistry;
 import net.minecraftforge.registries.IForgeRegistryEntry;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -14,7 +16,9 @@ import java.util.stream.Stream;
  * builds a collection for a given type of registry from a list of strings
  * @param <T> content type of collection to build
  */
-public class EntryCollectionBuilder<T extends IForgeRegistryEntry<T>> extends StringListParser<T> {
+public class EntryCollectionBuilder<T extends IForgeRegistryEntry<T>> extends StringEntryReader<T> {
+
+    public static final String CONFIG_STRING = "Format for every entry is \"<namespace>:<path>\". Path may use asterisk as wildcard parameter.";
 
     /**
      * @param registry registry entries the to be created collections contain
@@ -30,16 +34,16 @@ public class EntryCollectionBuilder<T extends IForgeRegistryEntry<T>> extends St
      */
     public Set<T> buildEntrySet(List<String> locations) {
 
-        return this.buildEntrySetWithCondition(locations, flag -> true, "");
+        return this.buildEntrySet(locations, flag -> true, "");
     }
 
     /**
      * @param locations resource locations to build set from
      * @return entry map associated with given resource locations in active registry paired with a given double value
      */
-    public Map<T, Double> buildEntryMap(List<String> locations) {
+    public Map<T, double[]> buildEntryMap(List<String> locations) {
 
-        return this.buildEntryMapWithCondition(locations, (entry, value) -> true, "");
+        return this.buildEntryMap(locations, (entry, value) -> true, "");
     }
 
     /**
@@ -48,7 +52,7 @@ public class EntryCollectionBuilder<T extends IForgeRegistryEntry<T>> extends St
      * @param message message to be logged when condition is not met
      * @return entry set associated with given resource locations in active registry
      */
-    public Set<T> buildEntrySetWithCondition(List<String> locations, Predicate<T> condition, String message) {
+    public Set<T> buildEntrySet(List<String> locations, Predicate<T> condition, String message) {
 
         Set<T> set = Sets.newHashSet();
         for (String source : locations) {
@@ -77,36 +81,37 @@ public class EntryCollectionBuilder<T extends IForgeRegistryEntry<T>> extends St
      * @param message message to be logged when condition is not met
      * @return entry map associated with given resource locations in active registry paired with a given double value
      */
-    public Map<T, Double> buildEntryMapWithCondition(List<String> locations, BiPredicate<T, Double> condition, String message) {
+    public Map<T, double[]> buildEntryMap(List<String> locations, BiPredicate<T, double[]> condition, String message) {
 
-        Map<T, Double> map = Maps.newHashMap();
+        Map<T, double[]> map = Maps.newHashMap();
         for (String source : locations) {
 
             String[] splitSource = Stream.of(source.split(",")).map(String::trim).toArray(String[]::new);
-            if (splitSource.length == 2) {
+            if (splitSource.length == 0) {
 
-                List<T> entries = this.getEntriesFromRegistry(splitSource[0]);
-                if (entries.isEmpty()) {
+                log(source, "Wrong number of arguments");
+                continue;
+            }
 
-                    continue;
-                }
+            List<T> entries = this.getEntriesFromRegistry(splitSource[0]);
+            if (entries.isEmpty()) {
 
-                parseDouble(splitSource[1], source).ifPresent(value -> entries.forEach(entry -> {
+                continue;
+            }
 
-                    if (condition.test(entry, value)) {
+            double[] values = Stream.of(splitSource).skip(1).mapToDouble(value -> parseDouble(value, source)).toArray();
+            for (T entry : entries) {
 
-                        if (this.isNotPresent(map.keySet(), entry)) {
+                if (condition.test(entry, values)) {
 
-                            map.put(entry, value);
-                        }
-                    } else {
+                    if (this.isNotPresent(map.keySet(), entry)) {
 
-                        log(source, message);
+                        map.put(entry, values);
                     }
-                }));
-            } else {
+                } else {
 
-                log(source, "Insufficient number of arguments");
+                    log(source, message);
+                }
             }
         }
 
@@ -116,19 +121,27 @@ public class EntryCollectionBuilder<T extends IForgeRegistryEntry<T>> extends St
     /**
      * @param value double to parse
      * @param source currently worked on entry for error message
-     * @return parsed double as optional
+     * @return parsed double
      */
-    private static Optional<Double> parseDouble(String value, String source) {
+    private static double parseDouble(String value, String source) {
+
+        if (value.equalsIgnoreCase(Boolean.TRUE.toString())) {
+
+            return 1.0;
+        } else if (value.equalsIgnoreCase(Boolean.FALSE.toString())) {
+
+            return 0.0;
+        }
 
         try {
 
-            return Optional.of(Double.parseDouble(value));
+            return Double.parseDouble(value);
         } catch (NumberFormatException ignored) {
 
             log(source, "Invalid number format");
         }
 
-        return Optional.empty();
+        return 0.0;
     }
 
 }

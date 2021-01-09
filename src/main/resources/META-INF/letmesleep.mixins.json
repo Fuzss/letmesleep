@@ -5,8 +5,10 @@
   "package": "com.fuzs.letmesleep.mixin",
   "refmap": "letmesleep.refmap.json",
   "mixins": [
+    "accessor.ILivingEntityAccessor"
   ],
   "client": [
+    "client.accessor.IChatScreenAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

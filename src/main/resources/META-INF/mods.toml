@@ -1,6 +1,6 @@
 modLoader="javafml"
 loaderVersion="[${loader_version},)"
-license="The Unlicense"
+license="Public Domain"
 
 [[mods]]
     modId="${mod_id}"
