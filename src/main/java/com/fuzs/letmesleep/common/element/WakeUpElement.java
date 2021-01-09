@@ -2,13 +2,15 @@ package com.fuzs.letmesleep.common.element;
 
 import com.fuzs.letmesleep.client.element.WakeUpClientElement;
 import com.fuzs.letmesleep.mixin.accessor.ILivingEntityAccessor;
+import com.fuzs.puzzleslib.config.ConfigManager;
 import com.fuzs.puzzleslib.config.deserialize.EntryCollectionBuilder;
 import com.fuzs.puzzleslib.element.AbstractElement;
 import com.fuzs.puzzleslib.element.ISidedElement;
-import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.potion.Effect;
 import net.minecraft.potion.EffectInstance;
+import net.minecraft.potion.EffectType;
+import net.minecraft.potion.Effects;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.living.PotionEvent;
@@ -16,7 +18,6 @@ import net.minecraftforge.event.entity.player.PlayerWakeUpEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import javax.annotation.Nullable;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -31,9 +32,10 @@ public class WakeUpElement extends AbstractElement implements ISidedElement.Comm
     private int healAmount;
     private boolean starvePlayer;
     private int starveAmount;
-    private ClearPotions clearPotions;
+    private ClearEffects clearEffects;
+    private Set<Effect> effectsNotToClear;
     private boolean applyEffects;
-    private Set<EffectInstance> potionEffects;
+    private Set<EffectInstance> effectsToApply;
 
     @Override
     public boolean getDefaultState() {
@@ -79,14 +81,15 @@ public class WakeUpElement extends AbstractElement implements ISidedElement.Comm
         addToConfig(builder.comment("Amount of health the player should regain. Set to 0 to fully heal.").defineInRange("Heal Amount", 0, 0, Integer.MAX_VALUE), v -> this.healAmount = v);
         addToConfig(builder.comment("Should the player loose some food after waking up.").define("Loose Food", false), v -> this.starvePlayer = v);
         addToConfig(builder.comment("Amount of food to loose when waking up. Set to 0 to completely starve the player.").defineInRange("Food Amount", 3, 0, Integer.MAX_VALUE), v -> this.starveAmount = v);
-        addToConfig(builder.comment("Clear potion effects after the player wakes up.").defineEnum("Clear Potions", ClearPotions.ALL), v -> this.clearPotions = v);
-        addToConfig(builder.comment("Should custom potion effects be applied to the player after waking up.").define("Apply Effects", false), v -> this.applyEffects = v);
-        addToConfig(builder.comment("Potion effects to be given to the player after waking up. Values are based on the \"/effect\" command.", "Format for every entry is \"<namespace>:<path>,[<seconds>],[<amplifier>],[<hideParticles>]\". Path may use asterisk as wildcard parameter.").define("Effects To Apply", Collections.singletonList("minecraft:regeneration")), v -> {
+        addToConfig(builder.comment("Clear potion effects after the player wakes up.").defineEnum("Clear Effects", ClearEffects.ALL), v -> this.clearEffects = v);
+        addToConfig(builder.comment("Blacklist to prevent potion effects from being removed after waking up.", EntryCollectionBuilder.CONFIG_STRING).define("Effects Not To Clear", ConfigManager.get().getKeyList(Effects.BAD_OMEN, Effects.CONDUIT_POWER)),v -> this.effectsNotToClear = deserializeToSet(v, ForgeRegistries.POTIONS));
+        addToConfig(builder.comment("Should custom potion effects be applied to the player after waking up.").define("Apply Effects", true), v -> this.applyEffects = v);
+        addToConfig(builder.comment("Potion effects to be given to the player after waking up. Values are based on the \"/effect\" command.", EntryCollectionBuilder.CONFIG_STRING_BUILDER.apply(",[<seconds>],[<amplifier>],[<hideParticles>]")).define("Effects To Apply", ConfigManager.get().getKeyList(Effects.SPEED)),v -> {
 
             // use a fallback in case not enough values have been supplied
             final Supplier<double[]> fallback = () -> new double[]{30.0, 0.0, 0.0};
             Map<Effect, double[]> effectMap = new EntryCollectionBuilder<>(ForgeRegistries.POTIONS).buildEntryMap(v, (entry, value) -> value.length < 4, "Wrong number of arguments");
-            this.potionEffects = effectMap.entrySet().stream().map(entry -> {
+            this.effectsToApply = effectMap.entrySet().stream().map(entry -> {
 
                 double[] array = fallback.get();
                 // copy to fallback, throws NullPointerException when source is empty
@@ -113,7 +116,7 @@ public class WakeUpElement extends AbstractElement implements ISidedElement.Comm
 
             this.healPlayer(evt.getPlayer());
             this.starvePlayer(evt.getPlayer());
-            this.clearEffects(evt.getPlayer());
+            this.clearActivePotions(evt.getPlayer());
             this.applyEffects(evt.getPlayer());
         }
     }
@@ -135,17 +138,25 @@ public class WakeUpElement extends AbstractElement implements ISidedElement.Comm
         }
     }
 
-    private void clearEffects(PlayerEntity player) {
+    private void clearActivePotions(PlayerEntity player) {
 
-        if (this.clearPotions == ClearPotions.ALL) {
+        if (this.clearEffects == ClearEffects.NONE) {
 
-            player.clearActivePotions();
-        } else if (this.clearPotions == ClearPotions.POSITIVE) {
+            return;
+        }
 
-            clearActivePotions(player, true);
-        } else if (this.clearPotions == ClearPotions.NEGATIVE) {
+        Iterator<EffectInstance> iterator = player.getActivePotionEffects().iterator();
+        while (iterator.hasNext()) {
 
-            clearActivePotions(player, false);
+            EffectInstance effect = iterator.next();
+            boolean isCancelled = MinecraftForge.EVENT_BUS.post(new PotionEvent.PotionRemoveEvent(player, effect));
+            if (isCancelled || !this.clearEffects.matches(effect.getPotion().getEffectType()) || this.effectsNotToClear.contains(effect.getPotion())) {
+
+                continue;
+            }
+
+            ((ILivingEntityAccessor) player).callOnFinishedPotionEffect(effect);
+            iterator.remove();
         }
     }
 
@@ -154,32 +165,26 @@ public class WakeUpElement extends AbstractElement implements ISidedElement.Comm
         if (this.applyEffects) {
 
             // makes a copy of every effect instance and adds them to the player
-            this.potionEffects.stream().map(EffectInstance::new).forEach(player::addPotionEffect);
-        }
-    }
-
-    private static void clearActivePotions(LivingEntity entity, boolean clearBeneficial) {
-
-        Iterator<EffectInstance> iterator = entity.getActivePotionEffects().iterator();
-        while (iterator.hasNext()) {
-
-            EffectInstance effect = iterator.next();
-            boolean isCancelled = MinecraftForge.EVENT_BUS.post(new PotionEvent.PotionRemoveEvent(entity, effect));
-            boolean isBeneficial = effect.getPotion().isBeneficial();
-            if (isCancelled || isBeneficial != clearBeneficial) {
-
-                continue;
-            }
-
-            ((ILivingEntityAccessor) entity).callOnFinishedPotionEffect(effect);
-            iterator.remove();
+            this.effectsToApply.stream().map(EffectInstance::new).forEach(player::addPotionEffect);
         }
     }
 
     @SuppressWarnings("unused")
-    private enum ClearPotions {
+    private enum ClearEffects {
 
-        NONE, POSITIVE, NEGATIVE, ALL
+        NONE(null), POSITIVE(EffectType.BENEFICIAL), NEGATIVE(EffectType.HARMFUL), ALL(null);
+
+        private final EffectType type;
+
+        ClearEffects(EffectType type) {
+
+            this.type = type;
+        }
+
+        boolean matches(EffectType type) {
+
+            return this == ALL || this.type == type;
+        }
 
     }
 

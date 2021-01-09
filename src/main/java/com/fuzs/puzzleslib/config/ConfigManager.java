@@ -3,15 +3,20 @@ package com.fuzs.puzzleslib.config;
 import com.fuzs.puzzleslib.PuzzlesLib;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.registries.IForgeRegistryEntry;
 
 import java.io.File;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -233,6 +238,21 @@ public class ConfigManager {
     public static String getConfigNameInFolder(ModConfig.Type type, String modId) {
 
         return modId + File.separator + getConfigName(type, modId);
+    }
+
+    /**
+     * @param entries entries to convert to string
+     * @param <T> registry element type
+     * @return entries as string list
+     */
+    @SafeVarargs
+    public final <T extends IForgeRegistryEntry<T>> List<String> getKeyList(T... entries) {
+
+        return Stream.of(entries)
+                .map(IForgeRegistryEntry::getRegistryName)
+                .filter(Objects::nonNull)
+                .map(ResourceLocation::toString)
+                .collect(Collectors.toList());
     }
 
     /**
