@@ -65,12 +65,11 @@ public abstract class ElementRegistry {
     /**
      * cast an element to its class type to make unique methods accessible
      * @param element element to get
-     * @param clazz type to cast to
      * @param <T> return type
      * @return <code>element</code> casted as <code>T</code>
      */
     @SuppressWarnings("unchecked")
-    public static <T extends AbstractElement> T getAs(AbstractElement element, Class<T> clazz) {
+    public static <T extends AbstractElement> T getAs(AbstractElement element) {
 
         return (T) element;
     }

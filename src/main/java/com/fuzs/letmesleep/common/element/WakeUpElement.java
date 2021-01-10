@@ -79,7 +79,7 @@ public class WakeUpElement extends AbstractElement implements ISidedElement.Comm
 
         addToConfig(builder.comment("Should the player be healed when waking up.").define("Heal Player", true), v -> this.healPlayer = v);
         addToConfig(builder.comment("Amount of health the player should regain. Set to 0 to fully heal.").defineInRange("Heal Amount", 0, 0, Integer.MAX_VALUE), v -> this.healAmount = v);
-        addToConfig(builder.comment("Should the player loose some food after waking up.").define("Loose Food", false), v -> this.starvePlayer = v);
+        addToConfig(builder.comment("Should the player loose some food after waking up.").define("Loose Food", true), v -> this.starvePlayer = v);
         addToConfig(builder.comment("Amount of food to loose when waking up. Set to 0 to completely starve the player.").defineInRange("Food Amount", 3, 0, Integer.MAX_VALUE), v -> this.starveAmount = v);
         addToConfig(builder.comment("Clear potion effects after the player wakes up.").defineEnum("Clear Effects", ClearEffects.ALL), v -> this.clearEffects = v);
         addToConfig(builder.comment("Blacklist to prevent potion effects from being removed after waking up.", EntryCollectionBuilder.CONFIG_STRING).define("Effects Not To Clear", ConfigManager.get().getKeyList(Effects.BAD_OMEN, Effects.CONDUIT_POWER)),v -> this.effectsNotToClear = deserializeToSet(v, ForgeRegistries.POTIONS));

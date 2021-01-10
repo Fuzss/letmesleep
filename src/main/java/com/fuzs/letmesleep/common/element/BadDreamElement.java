@@ -68,7 +68,7 @@ public class BadDreamElement extends AbstractElement implements ISidedElement.Co
     @Override
     public void setupCommonConfig(ForgeConfigSpec.Builder builder) {
 
-        addToConfig(builder.comment("Chance to spawn a monster. Higher values make it more likely to happen.").defineInRange("Spawn Monster Chance", 8, 0, 128), v -> this.spawnMonsterChance = v);
+        addToConfig(builder.comment("Chance to spawn a monster. Higher values make it more likely to happen.").defineInRange("Spawn Monster Chance", 12, 0, 128), v -> this.spawnMonsterChance = v);
         addToConfig(builder.comment("Range to spawn a monster in from the bed. Increasing the range makes it a lot less likely for a monster to spawn.").defineInRange("Spawn Monster Range", 2, 0, 16), v -> this.spawnMonsterRange = v);
         addToConfig(builder.comment("Possible monsters to spawn. One entry is chosen at random.", EntryCollectionBuilder.CONFIG_STRING_BUILDER.apply(",<weight>")).define("Spawnable Monsters", Lists.newArrayList(getEntityAndWeight(EntityType.ZOMBIE, 2), getEntityAndWeight(EntityType.SKELETON, 1), getEntityAndWeight(EntityType.SPIDER, 1))),v -> {
 
@@ -114,7 +114,7 @@ public class BadDreamElement extends AbstractElement implements ISidedElement.Co
                 continue;
             }
 
-            int maxAttempts = this.spawnMonsterChance * (int) Math.pow(3, world.getDifficulty().getId() - 1);
+            int maxAttempts = this.spawnMonsterChance * (int) Math.pow(2, world.getDifficulty().getId() - 1);
             for (int index = 0; index < maxAttempts; index++) {
 
                 if (this.trySpawnMonster(world, player, spawningBoundingBox)) {

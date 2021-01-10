@@ -1,6 +1,6 @@
 package com.fuzs.letmesleep;
 
-import com.fuzs.letmesleep.common.element.LetMeSleepElements;
+import com.fuzs.letmesleep.common.LetMeSleepElements;
 import com.fuzs.puzzleslib.PuzzlesLib;
 import com.fuzs.puzzleslib.config.ConfigManager;
 import net.minecraftforge.fml.common.Mod;

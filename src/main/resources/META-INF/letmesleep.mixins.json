@@ -6,7 +6,9 @@
   "refmap": "letmesleep.refmap.json",
   "mixins": [
     "accessor.ILivingEntityAccessor",
-    "accessor.IServerWorldAccessor"
+    "accessor.IServerWorldAccessor",
+    "accessor.IServerPlayerEntityAccessor",
+    "accessor.IPlayerEntityAccessor"
   ],
   "client": [
     "client.accessor.IChatScreenAccessor"
