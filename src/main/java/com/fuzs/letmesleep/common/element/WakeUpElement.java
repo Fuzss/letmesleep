@@ -44,12 +44,6 @@ public class WakeUpElement extends AbstractElement implements ISidedElement.Comm
     }
 
     @Override
-    public String getDisplayName() {
-        
-        return "Wake Up Actions";
-    }
-
-    @Override
     public String getDescription() {
 
         return "A bunch of options that may happen when the player wakes up from sleeping in a bed.";
@@ -79,29 +73,31 @@ public class WakeUpElement extends AbstractElement implements ISidedElement.Comm
 
         addToConfig(builder.comment("Should the player be healed when waking up.").define("Heal Player", true), v -> this.healPlayer = v);
         addToConfig(builder.comment("Amount of health the player should regain. Set to 0 to fully heal.").defineInRange("Heal Amount", 0, 0, Integer.MAX_VALUE), v -> this.healAmount = v);
-        addToConfig(builder.comment("Should the player loose some food after waking up.").define("Loose Food", true), v -> this.starvePlayer = v);
+        addToConfig(builder.comment("Should the player loose some food after waking up.").define("Loose Food", false), v -> this.starvePlayer = v);
         addToConfig(builder.comment("Amount of food to loose when waking up. Set to 0 to completely starve the player.").defineInRange("Food Amount", 3, 0, Integer.MAX_VALUE), v -> this.starveAmount = v);
         addToConfig(builder.comment("Clear potion effects after the player wakes up.").defineEnum("Clear Effects", ClearEffects.ALL), v -> this.clearEffects = v);
-        addToConfig(builder.comment("Blacklist to prevent potion effects from being removed after waking up.", EntryCollectionBuilder.CONFIG_STRING).define("Effects Not To Clear", ConfigManager.get().getKeyList(Effects.BAD_OMEN, Effects.CONDUIT_POWER)),v -> this.effectsNotToClear = deserializeToSet(v, ForgeRegistries.POTIONS));
+        addToConfig(builder.comment("Blacklist to prevent potion effects from being removed after waking up.", EntryCollectionBuilder.CONFIG_STRING).define("Effects Not To Clear", ConfigManager.get().getKeyList(Effects.BAD_OMEN, Effects.CONDUIT_POWER)),v -> this.effectsNotToClear = v, v -> deserializeToSet(v, ForgeRegistries.POTIONS));
         addToConfig(builder.comment("Should custom potion effects be applied to the player after waking up.").define("Apply Effects", true), v -> this.applyEffects = v);
-        addToConfig(builder.comment("Potion effects to be given to the player after waking up. Values are based on the \"/effect\" command.", EntryCollectionBuilder.CONFIG_STRING_BUILDER.apply(",[<seconds>],[<amplifier>],[<hideParticles>]")).define("Effects To Apply", ConfigManager.get().getKeyList(Effects.SPEED)),v -> {
+        addToConfig(builder.comment("Potion effects to be given to the player after waking up. Values are based on the \"/effect\" command.", EntryCollectionBuilder.CONFIG_STRING_BUILDER.apply(",[<seconds>],[<amplifier>],[<hideParticles>]")).define("Effects To Apply", ConfigManager.get().getKeyList(Effects.SPEED)),v -> this.effectsToApply = v, this::transformEffectsToApply);
+    }
 
-            // use a fallback in case not enough values have been supplied
-            final Supplier<double[]> fallback = () -> new double[]{30.0, 0.0, 0.0};
-            Map<Effect, double[]> effectMap = new EntryCollectionBuilder<>(ForgeRegistries.POTIONS).buildEntryMap(v, (entry, value) -> value.length < 4, "Wrong number of arguments");
-            this.effectsToApply = effectMap.entrySet().stream().map(entry -> {
+    private Set<EffectInstance> transformEffectsToApply(java.util.List<String> v) {
 
-                double[] array = fallback.get();
-                // copy to fallback, throws NullPointerException when source is empty
-                if (entry.getValue().length != 0) {
+        // use a fallback in case not enough values have been supplied
+        final Supplier<double[]> fallback = () -> new double[]{30.0, 0.0, 0.0};
+        Map<Effect, double[]> effectMap = new EntryCollectionBuilder<>(ForgeRegistries.POTIONS).buildEntryMap(v, (entry, value) -> value.length < 4, "Wrong number of arguments");
+        return effectMap.entrySet().stream().map(entry -> {
 
-                    System.arraycopy(entry.getValue(), 0, array, 0, array.length);
-                }
+            double[] array = fallback.get();
+            // copy to fallback, throws NullPointerException when source is empty
+            if (entry.getValue().length != 0) {
 
-                // multiply duration by 20 as it's handled in ticks
-                return new EffectInstance(entry.getKey(), (int) array[0] * 20, (int) array[1], false, array[2] != 1.0);
-            }).collect(Collectors.toSet());
-        });
+                System.arraycopy(entry.getValue(), 0, array, 0, array.length);
+            }
+
+            // multiply duration by 20 as it's handled in ticks
+            return new EffectInstance(entry.getKey(), (int) array[0] * 20, (int) array[1], false, array[2] != 1.0);
+        }).collect(Collectors.toSet());
     }
 
     @Override

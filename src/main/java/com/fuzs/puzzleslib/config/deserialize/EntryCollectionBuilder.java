@@ -51,10 +51,10 @@ public class EntryCollectionBuilder<T extends IForgeRegistryEntry<T>> extends St
     /**
      * @param locations resource locations to build set from
      * @param condition condition need to match for an entry to be added to the set
-     * @param message message to be logged when condition is not met
+     * @param errorMessage message to be logged when condition is not met
      * @return entry set associated with given resource locations in active registry
      */
-    public Set<T> buildEntrySet(List<String> locations, Predicate<T> condition, String message) {
+    public Set<T> buildEntrySet(List<String> locations, Predicate<T> condition, String errorMessage) {
 
         Set<T> set = Sets.newHashSet();
         for (String source : locations) {
@@ -69,7 +69,7 @@ public class EntryCollectionBuilder<T extends IForgeRegistryEntry<T>> extends St
                     }
                 } else {
 
-                    log(source, message);
+                    log(source, errorMessage);
                 }
             });
         }
@@ -80,10 +80,10 @@ public class EntryCollectionBuilder<T extends IForgeRegistryEntry<T>> extends St
     /**
      * @param locations resource locations to build set from
      * @param condition condition need to match for an entry to be added to the map
-     * @param message message to be logged when condition is not met
+     * @param errorMessage message to be logged when condition is not met
      * @return entry map associated with given resource locations in active registry paired with a given double value
      */
-    public Map<T, double[]> buildEntryMap(List<String> locations, BiPredicate<T, double[]> condition, String message) {
+    public Map<T, double[]> buildEntryMap(List<String> locations, BiPredicate<T, double[]> condition, String errorMessage) {
 
         Map<T, double[]> map = Maps.newHashMap();
         for (String source : locations) {
@@ -112,7 +112,7 @@ public class EntryCollectionBuilder<T extends IForgeRegistryEntry<T>> extends St
                     }
                 } else {
 
-                    log(source, message);
+                    log(source, errorMessage);
                 }
             }
         }

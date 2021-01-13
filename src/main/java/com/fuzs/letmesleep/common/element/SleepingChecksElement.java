@@ -2,16 +2,22 @@ package com.fuzs.letmesleep.common.element;
 
 import com.fuzs.letmesleep.mixin.accessor.IPlayerEntityAccessor;
 import com.fuzs.letmesleep.mixin.accessor.IServerPlayerEntityAccessor;
+import com.fuzs.letmesleep.mixin.accessor.IServerWorldAccessor;
+import com.fuzs.puzzleslib.config.deserialize.EntryCollectionBuilder;
 import com.fuzs.puzzleslib.element.AbstractElement;
 import com.fuzs.puzzleslib.element.ISidedElement;
+import com.google.common.collect.Lists;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.block.HorizontalBlock;
+import net.minecraft.entity.EntityClassification;
+import net.minecraft.entity.EntityType;
 import net.minecraft.entity.monster.MonsterEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.potion.EffectInstance;
 import net.minecraft.potion.Effects;
 import net.minecraft.stats.Stats;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Direction;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
@@ -21,10 +27,12 @@ import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.event.entity.player.PlayerSleepInBedEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -34,21 +42,16 @@ public class SleepingChecksElement extends AbstractElement implements ISidedElem
     private boolean rangeCheck;
     private boolean obstructionCheck;
     private boolean monsterCheck;
+    private Set<? extends EntityType<?>> monsterBlacklist;
     private boolean makeMonstersGlow;
     private int monsterGlowDuration;
     private boolean allowNamedMonsters;
-    private boolean allowPersistentMonsters;
+    private boolean instantSleeping;
 
     @Override
     public boolean getDefaultState() {
 
         return true;
-    }
-
-    @Override
-    public String getDisplayName() {
-
-        return "Sleeping Checks";
     }
 
     @Override
@@ -70,17 +73,18 @@ public class SleepingChecksElement extends AbstractElement implements ISidedElem
         addToConfig(builder.comment("Check if the player is close enough to the bed.").define("Perform Range Check", false), v -> this.rangeCheck = v);
         addToConfig(builder.comment("Check if the bed has enough open space above it.").define("Perform Obstruction Check", true), v -> this.obstructionCheck = v);
         addToConfig(builder.comment("Check if monsters are nearby.").define("Perform Monster Check", true), v -> this.monsterCheck = v);
+        addToConfig(builder.comment("Monsters to be ignored when checking for monsters nearby.", EntryCollectionBuilder.CONFIG_STRING).define("Monster Check Blacklist", Lists.<String>newArrayList()),v -> this.monsterBlacklist = v, v -> new EntryCollectionBuilder<>(ForgeRegistries.ENTITIES).buildEntrySet(v, entry -> entry.getClassification() == EntityClassification.MONSTER, "Not a monster"));
         addToConfig(builder.comment("Should monsters preventing the player from sleeping glow.").define("Make Monsters Glow", true), v -> this.makeMonstersGlow = v);
         addToConfig(builder.comment("Duration in seconds for which the monsters nearby will glow.").defineInRange("Monster Glowing Duration", 3, 0, Integer.MAX_VALUE), v -> this.monsterGlowDuration = v);
         addToConfig(builder.comment("Should sleeping be allowed when named monsters are nearby.").define("Allow Named Monsters", true), v -> this.allowNamedMonsters = v);
-        addToConfig(builder.comment("Should sleeping be possible when persistent monsters (unable to despawn) are nearby.").define("Allow Persistent Monsters", true), v -> this.allowPersistentMonsters = v);
+        addToConfig(builder.comment("Removes the falling asleep animation, so the player wakes up instantly after going to bed. Only works when all other players on the server are already asleep.").define("Instant Sleeping", false), v -> this.instantSleeping = v);
     }
 
     private void onPlayerSleepInBed(final PlayerSleepInBedEvent evt) {
 
         BlockPos at = evt.getPos();
         PlayerEntity.SleepResult result = evt.getResultStatus();
-        boolean isModInterfering = result != null || at == null || !evt.getPlayer().world.getBlockState(at).isBed(evt.getPlayer().world, at, evt.getPlayer());
+        boolean isModInterfering = result != null || at == null || !evt.getPlayer().world.getBlockState(at).isIn(BlockTags.BEDS);
         if (isModInterfering || evt.getPlayer().isSleeping() || !evt.getPlayer().isAlive()) {
 
             return;
@@ -112,6 +116,7 @@ public class SleepingChecksElement extends AbstractElement implements ISidedElem
 
             this.trySleep(player, at);
             world.updateAllPlayersSleepingFlag();
+            this.setInstantSleeping(player, player.getServerWorld());
             evt.setResult(PlayerEntity.SleepResult.OTHER_PROBLEM);
         }
     }
@@ -159,11 +164,11 @@ public class SleepingChecksElement extends AbstractElement implements ISidedElem
 
     private boolean isMonsterNearby(MonsterEntity monster, PlayerEntity player) {
 
+        boolean isBlacklisted = this.monsterBlacklist.contains(monster.getType());
         boolean isNamed = !this.allowNamedMonsters || !monster.hasCustomName();
-        boolean isPersistent = !this.allowPersistentMonsters || !monster.isNoDespawnRequired();
 
         // isPreventingPlayerRest
-        return monster.isAlive() && monster.func_230292_f_(player) && isNamed && isPersistent;
+        return !isBlacklisted && monster.isAlive() && monster.func_230292_f_(player) && isNamed;
     }
 
     private void trySleep(ServerPlayerEntity player, BlockPos at) {
@@ -172,6 +177,20 @@ public class SleepingChecksElement extends AbstractElement implements ISidedElem
         ((IPlayerEntityAccessor) player).setSleepTimer(0);
         player.addStat(Stats.SLEEP_IN_BED);
         CriteriaTriggers.SLEPT_IN_BED.trigger(player);
+    }
+
+    private void setInstantSleeping(ServerPlayerEntity player, ServerWorld world) {
+
+        // needs to run after ServerPlayerEntity#startSleeping is called
+        if (this.instantSleeping && ((IServerWorldAccessor) world).getAllPlayersSleeping()) {
+
+            int sleepTimer = world.getPlayers().stream()
+                    .filter(entity -> !entity.isSpectator() && entity != player)
+                    .mapToInt(entity -> ((IPlayerEntityAccessor) player).getSleepTimer())
+                    .min().orElse(100);
+
+            ((IPlayerEntityAccessor) player).setSleepTimer(sleepTimer);
+        }
     }
 
 }

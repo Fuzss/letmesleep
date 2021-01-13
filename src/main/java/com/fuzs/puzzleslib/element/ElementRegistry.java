@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * default registry for elements
@@ -44,7 +45,9 @@ public abstract class ElementRegistry {
 
         if (element instanceof ISidedElement) {
 
-            ELEMENTS.put(new ResourceLocation(namespace, key), element);
+            ResourceLocation location = new ResourceLocation(namespace, key);
+            ELEMENTS.put(location, element);
+            element.setRegistryName(location);
             return element;
         }
 
@@ -63,6 +66,24 @@ public abstract class ElementRegistry {
     }
 
     /**
+     * @param namespace namespace of owning mod
+     * @param key key for element to get
+     * @param path path for config value
+     * @return the config value
+     */
+    @SuppressWarnings("OptionalIsPresent")
+    public static Optional<Object> getConfigValue(String namespace, String key, String... path) {
+
+        Optional<AbstractElement> element = get(namespace, key);
+        if (element.isPresent()) {
+
+            return getConfigValue(element.get(), path);
+        }
+
+        return Optional.empty();
+    }
+
+    /**
      * cast an element to its class type to make unique methods accessible
      * @param element element to get
      * @param <T> return type
@@ -75,15 +96,29 @@ public abstract class ElementRegistry {
     }
 
     /**
+     * @param element element to get value from
+     * @param path path for config value
+     * @return the config value
+     */
+    public static Optional<Object> getConfigValue(AbstractElement element, String... path) {
+
+        if (element.isEnabled()) {
+
+            String fullPath = Stream.concat(Stream.of(element.getRegistryName()), Stream.of(path)).collect(Collectors.joining("."));
+            return Optional.of(ConfigManager.get().getValueFromPath(fullPath));
+        }
+
+        return Optional.empty();
+    }
+
+    /**
      * generate general config section for controlling elements, setup individual config sections and collect events to be registered in {@link #load}
      */
     protected static void setup() {
 
         Map<ResourceLocation, AbstractElement> elements = getOwnElements();
         ConfigManager.builder().create("general", builder -> elements.values().forEach(element -> element.setupGeneralConfig(builder)), getSide(elements.values()));
-        elements.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getValue, entry -> entry.getKey().getPath()))
-                .forEach(AbstractElement::setup);
+        elements.values().forEach(AbstractElement::setup);
     }
 
     /**

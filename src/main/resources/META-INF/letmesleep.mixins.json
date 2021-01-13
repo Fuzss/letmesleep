@@ -5,6 +5,8 @@
   "package": "com.fuzs.letmesleep.mixin",
   "refmap": "letmesleep.refmap.json",
   "mixins": [
+    "BedBlockMixin",
+    "RespawnAnchorBlockMixin",
     "accessor.ILivingEntityAccessor",
     "accessor.IServerWorldAccessor",
     "accessor.IServerPlayerEntityAccessor",

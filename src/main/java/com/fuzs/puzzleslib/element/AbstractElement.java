@@ -3,6 +3,7 @@ package com.fuzs.puzzleslib.element;
 import com.fuzs.puzzleslib.config.ConfigManager;
 import com.fuzs.puzzleslib.config.deserialize.EntryCollectionBuilder;
 import com.google.common.collect.Lists;
+import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.Cancelable;
@@ -12,6 +13,7 @@ import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.registries.IForgeRegistry;
 import net.minecraftforge.registries.IForgeRegistryEntry;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.annotation.Nullable;
 import java.util.List;
@@ -20,16 +22,23 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * all features a mod adds are structured into elements which are then registered, this is an abstract version
  */
+@SuppressWarnings("unused")
 public abstract class AbstractElement implements IConfigurableElement {
 
     /**
      * all events registered by this element
      */
     private final List<EventStorage<? extends Event>> events = Lists.newArrayList();
+    /**
+     * name of this element
+     */
+    private ResourceLocation registryName;
     /**
      * is this element enabled (are events registered)
      */
@@ -45,6 +54,35 @@ public abstract class AbstractElement implements IConfigurableElement {
     @Nullable
     private ISidedElement.Server serverPerformer;
 
+    public final void setRegistryName(ResourceLocation location) {
+
+        if (this.registryName != null) {
+
+            throw new RuntimeException("Unable to set registry name for element: " + "Name already set");
+        }
+
+        this.registryName = location;
+    }
+
+    /**
+     * @return name set in elements registry
+     */
+    public final String getRegistryName() {
+
+        if (this.registryName == null) {
+
+            throw new RuntimeException("Unable to get registry name for element: " + "Name not set");
+        }
+
+        return this.registryName.getPath();
+    }
+
+    @Override
+    public final String getDisplayName() {
+
+        return Stream.of(this.getRegistryName().split("_")).map(StringUtils::capitalize).collect(Collectors.joining(" "));
+    }
+
     @Override
     public final void setupGeneralConfig(ForgeConfigSpec.Builder builder) {
 
@@ -53,12 +91,11 @@ public abstract class AbstractElement implements IConfigurableElement {
 
     /**
      * build element config and get event listeners
-     * @param elementId id of this element for config section
      */
-    public final void setup(String elementId) {
+    public final void setup() {
 
         this.setupPerformers();
-        this.setupConfig(elementId);
+        this.setupConfig(this.getRegistryName());
         this.setup(ISidedElement.Common::setupCommon, ISidedElement.Client::setupClient, ISidedElement.Server::setupServer);
     }
 
@@ -230,6 +267,19 @@ public abstract class AbstractElement implements IConfigurableElement {
     public static <S extends ForgeConfigSpec.ConfigValue<T>, T> void addToConfig(S entry, Consumer<T> action) {
 
         ConfigManager.get().registerEntry(entry, action);
+    }
+
+    /**
+     * @param entry config entry to add
+     * @param action consumer for updating value when changed
+     * @param transformer transformation to apply when returning value
+     * @param <S> type of config value
+     * @param <T> field type
+     * @param <R> final return type of config entry
+     */
+    public static <S extends ForgeConfigSpec.ConfigValue<T>, T, R> void addToConfig(S entry, Consumer<R> action, Function<T, R> transformer) {
+
+        ConfigManager.get().registerEntry(entry, action, transformer);
     }
 
     /**

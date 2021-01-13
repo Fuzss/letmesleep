@@ -10,4 +10,7 @@ public interface IPlayerEntityAccessor {
     @Accessor
     void setSleepTimer(int sleepTimer);
 
+    @Accessor
+    int getSleepTimer();
+
 }

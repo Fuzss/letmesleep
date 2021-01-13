@@ -2,7 +2,6 @@ package com.fuzs.puzzleslib.config;
 
 import com.fuzs.puzzleslib.PuzzlesLib;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.ModLoadingContext;
@@ -14,14 +13,16 @@ import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * main config manager for this mod
  */
+@SuppressWarnings("unused")
 public class ConfigManager {
 
     /**
@@ -36,7 +37,7 @@ public class ConfigManager {
     /**
      * all config entries as a set
      */
-    private final Set<ConfigEntry<? extends ForgeConfigSpec.ConfigValue<?>, ?>> configEntries = Sets.newHashSet();
+    private final Map<String, ConfigEntry<? extends ForgeConfigSpec.ConfigValue<?>, ?, ?>> configEntries = Maps.newHashMap();
     /**
      * listeners to call when a config is somehow loaded
      */
@@ -97,9 +98,33 @@ public class ConfigManager {
      * @param modid mod to get entries for
      * @return stream of entries only for this mod
      */
-    private Stream<ConfigEntry<? extends ForgeConfigSpec.ConfigValue<?>, ?>> getEntriesForMod(String modid) {
+    private Stream<ConfigEntry<? extends ForgeConfigSpec.ConfigValue<?>, ?, ?>> getEntriesForMod(String modid) {
 
-        return this.configEntries.stream().filter(entry -> entry.getModId().equals(modid));
+        return this.configEntries.values().stream().filter(entry -> entry.getModId().equals(modid));
+    }
+
+    /**
+     * @param paths individual parts of path for config value
+     * @return the config value
+     */
+    public Object getValueFromPath(String... paths) {
+
+        return this.getValueFromPath(String.join(".", paths));
+    }
+
+    /**
+     * @param path path for config value
+     * @return the config value
+     */
+    public Object getValueFromPath(String path) {
+
+        Optional<Object> optional = Optional.ofNullable(this.configEntries.get(path)).map(ConfigEntry::getValue);
+        if (optional.isPresent()) {
+
+            return optional.get();
+        }
+
+        throw new RuntimeException("Unable to get config value for path \"" + path + "\": " + "Path not found");
     }
 
     /**
@@ -111,7 +136,7 @@ public class ConfigManager {
      */
     public <S extends ForgeConfigSpec.ConfigValue<T>, T> void registerCommonEntry(S entry, Consumer<T> action) {
 
-        this.registerEntry(ModConfig.Type.COMMON, entry, action);
+        this.registerEntry(ModConfig.Type.COMMON, entry, action, Function.identity());
     }
 
     /**
@@ -123,7 +148,7 @@ public class ConfigManager {
      */
     public <S extends ForgeConfigSpec.ConfigValue<T>, T> void registerClientEntry(S entry, Consumer<T> action) {
 
-        this.registerEntry(ModConfig.Type.CLIENT, entry, action);
+        this.registerEntry(ModConfig.Type.CLIENT, entry, action, Function.identity());
     }
 
     /**
@@ -135,20 +160,7 @@ public class ConfigManager {
      */
     public <S extends ForgeConfigSpec.ConfigValue<T>, T> void registerServerEntry(S entry, Consumer<T> action) {
 
-        this.registerEntry(ModConfig.Type.SERVER, entry, action);
-    }
-
-    /**
-     * register config entry for given type
-     * @param type type of config to register for
-     * @param entry source config value object
-     * @param action action to perform when value changes (is reloaded)
-     * @param <S> config value of a certain type
-     * @param <T> type for value
-     */
-    private <S extends ForgeConfigSpec.ConfigValue<T>, T> void registerEntry(ModConfig.Type type, S entry, Consumer<T> action) {
-
-        this.configEntries.add(new ConfigEntry<>(type, entry, action, this.getActiveNamespace()));
+        this.registerEntry(ModConfig.Type.SERVER, entry, action, Function.identity());
     }
 
     /**
@@ -160,17 +172,46 @@ public class ConfigManager {
      */
     public <S extends ForgeConfigSpec.ConfigValue<T>, T> void registerEntry(S entry, Consumer<T> action) {
 
+        this.registerEntry(entry, action, Function.identity());
+    }
+
+    /**
+     * register config entry for active type
+     * @param entry source config value object
+     * @param action action to perform when value changes (is reloaded)
+     * @param transformer transformation to apply when returning value
+     * @param <S> config value of a certain type
+     * @param <T> type for value
+     * @param <R> final return type of config entry
+     */
+    public <S extends ForgeConfigSpec.ConfigValue<T>, T, R> void registerEntry(S entry, Consumer<R> action, Function<T, R> transformer) {
+
         ModConfig.Type activeType = this.getBuilder().getActiveType();
         if (activeType == null) {
 
             PuzzlesLib.LOGGER.error("Unable to register config entry: " + "Active builder is null");
         } else if (this.getBuilder().isSpecNotBuilt(activeType)) {
 
-            this.configEntries.add(new ConfigEntry<>(activeType, entry, action, this.getActiveNamespace()));
+            this.registerEntry(activeType, entry, action, transformer);
         } else {
 
             PuzzlesLib.LOGGER.error("Unable to register config entry: " + "Config spec already built");
         }
+    }
+
+    /**
+     * register config entry for given type
+     * @param type type of config to register for
+     * @param entry source config value object
+     * @param action action to perform when value changes (is reloaded)
+     * @param transformer transformation to apply when returning value
+     * @param <S> config value of a certain type
+     * @param <T> type for value
+     * @param <R> final return type of config entry
+     */
+    private <S extends ForgeConfigSpec.ConfigValue<T>, T, R> void registerEntry(ModConfig.Type type, S entry, Consumer<R> action, Function<T, R> transformer) {
+
+        this.configEntries.put(String.join(".", entry.getPath()), new ConfigEntry<>(type, entry, action, transformer, this.getActiveNamespace()));
     }
 
     /**
@@ -310,7 +351,7 @@ public class ConfigManager {
      * @param <S> config value of a certain type
      * @param <T> type for value
      */
-    private static class ConfigEntry<S extends ForgeConfigSpec.ConfigValue<T>, T> {
+    private static class ConfigEntry<S extends ForgeConfigSpec.ConfigValue<T>, T, R> {
 
         /**
          * config type of this entry
@@ -323,7 +364,11 @@ public class ConfigManager {
         /**
          * action to perform when the entry is updated
          */
-        final Consumer<T> action;
+        final Consumer<R> action;
+        /**
+         * transformation to apply when returning value, usually {@link Function#identity}
+         */
+        final Function<T, R> transformer;
         /**
          * source mod this entry belongs to
          */
@@ -332,11 +377,12 @@ public class ConfigManager {
         /**
          * new entry storage
          */
-        ConfigEntry(ModConfig.Type type, S entry, Consumer<T> action, String modid) {
+        ConfigEntry(ModConfig.Type type, S entry, Consumer<R> action, Function<T, R> transformer, String modid) {
 
             this.type = type;
             this.entry = entry;
             this.action = action;
+            this.transformer = transformer;
             this.modid = modid;
         }
 
@@ -359,11 +405,19 @@ public class ConfigManager {
         }
 
         /**
+         * @return current value from entry
+         */
+        R getValue() {
+
+            return this.transformer.apply(this.entry.get());
+        }
+
+        /**
          * get value from config value and supply it to consumer
          */
         void sync() {
 
-            this.action.accept(this.entry.get());
+            this.action.accept(this.getValue());
         }
 
     }

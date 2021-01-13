@@ -15,6 +15,7 @@ import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.pathfinding.Path;
 import net.minecraft.pathfinding.PathPoint;
 import net.minecraft.state.properties.BedPart;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Direction;
 import net.minecraft.util.EntityPredicates;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -28,29 +29,22 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import javax.annotation.Nullable;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
 public class BadDreamElement extends AbstractElement implements ISidedElement.Common {
 
-    private int spawnMonsterChance;
-    private int spawnMonsterRange;
-    private Map<EntityType<?>, Integer> spawnableMonsters;
+    // config settings
+    private int monsterSpawnAttempts;
+    private int monsterSpawnRange;
+    private int maxMonsterCount;
+    private Map<? extends EntityType<?>, Integer> spawnableMonsters;
 
     @Override
     public boolean getDefaultState() {
 
         return true;
-    }
-
-    @Override
-    public String getDisplayName() {
-
-        return "Bad Dreams";
     }
 
     @Override
@@ -68,14 +62,18 @@ public class BadDreamElement extends AbstractElement implements ISidedElement.Co
     @Override
     public void setupCommonConfig(ForgeConfigSpec.Builder builder) {
 
-        addToConfig(builder.comment("Chance to spawn a monster. Higher values make it more likely to happen.").defineInRange("Spawn Monster Chance", 12, 0, 128), v -> this.spawnMonsterChance = v);
-        addToConfig(builder.comment("Range to spawn a monster in from the bed. Increasing the range makes it a lot less likely for a monster to spawn.").defineInRange("Spawn Monster Range", 2, 0, 16), v -> this.spawnMonsterRange = v);
-        addToConfig(builder.comment("Possible monsters to spawn. One entry is chosen at random.", EntryCollectionBuilder.CONFIG_STRING_BUILDER.apply(",<weight>")).define("Spawnable Monsters", Lists.newArrayList(getEntityAndWeight(EntityType.ZOMBIE, 2), getEntityAndWeight(EntityType.SKELETON, 1), getEntityAndWeight(EntityType.SPIDER, 1))),v -> {
+        addToConfig(builder.comment("Chance to spawn a monster. Higher values make it more likely to happen.").defineInRange("Monster Spawn Attempts", 12, 0, 128), v -> this.monsterSpawnAttempts = v);
+        addToConfig(builder.comment("Range to spawn a monster in from the bed. Increasing the range makes it a lot less likely for a monster to spawn.").defineInRange("Monster Spawn Range", 2, 0, 12), v -> this.monsterSpawnRange = v);
+        addToConfig(builder.comment("Amount of monsters to spawn. This value defines attempts and is therefore not guaranteed to be reached.").defineInRange("Max Monster Count", 1, 0, 12), v -> this.maxMonsterCount = v);
+        addToConfig(builder.comment("Possible monsters to spawn. One entry is chosen at random in regards to weight.", EntryCollectionBuilder.CONFIG_STRING_BUILDER.apply(",<weight>")).define("Spawnable Monsters", Lists.newArrayList(getEntityAndWeight(EntityType.ZOMBIE, 2), getEntityAndWeight(EntityType.SKELETON, 1), getEntityAndWeight(EntityType.SPIDER, 1))), v -> this.spawnableMonsters = v, this::transformSpawnableMonsters);
+    }
 
-            BiPredicate<EntityType<?>, double[]> predicate = (entry, value) -> entry.getClassification() == EntityClassification.MONSTER && value.length == 1 && value[0] > 0;
-            Map<EntityType<?>, double[]> entries = new EntryCollectionBuilder<>(ForgeRegistries.ENTITIES).buildEntryMap(v, predicate , "Not a monster or incorrect weight");
-            this.spawnableMonsters = entries.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, value -> (int) value.getValue()[0]));
-        });
+    private Map<? extends EntityType<?>, Integer> transformSpawnableMonsters(ArrayList<String> v) {
+
+        BiPredicate<EntityType<?>, double[]> predicate = (entry, value) -> entry.getClassification() == EntityClassification.MONSTER && value.length == 1 && value[0] > 0;
+        Map<EntityType<?>, double[]> entries = new EntryCollectionBuilder<>(ForgeRegistries.ENTITIES).buildEntryMap(v, predicate , "Not a monster or incorrect weight");
+
+        return entries.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, value -> (int) value.getValue()[0]));
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -114,12 +112,15 @@ public class BadDreamElement extends AbstractElement implements ISidedElement.Co
                 continue;
             }
 
-            int maxAttempts = this.spawnMonsterChance * (int) Math.pow(2, world.getDifficulty().getId() - 1);
-            for (int index = 0; index < maxAttempts; index++) {
+            int maxAttempts = this.monsterSpawnAttempts * (int) Math.pow(2, world.getDifficulty().getId() - 1);
+            for (int count = 0; count < this.maxMonsterCount; count++) {
 
-                if (this.trySpawnMonster(world, player, spawningBoundingBox)) {
+                for (int attempt = 0; attempt < maxAttempts; attempt++) {
 
-                    break;
+                    if (this.trySpawnMonster(world, player, spawningBoundingBox)) {
+
+                        break;
+                    }
                 }
             }
         }
@@ -159,14 +160,14 @@ public class BadDreamElement extends AbstractElement implements ISidedElement.Co
         BlockPos bedPos = player.getBedPosition().get();
         BlockState state = world.getBlockState(bedPos);
         // mods could add bed position which is not a bed
-        if (state.isBed(world, bedPos, player)) {
+        if (state.isIn(BlockTags.BEDS)) {
 
             Direction bedPosDirection = state.get(HorizontalBlock.HORIZONTAL_FACING);
             // check for part, who knows what might happen
             Direction otherPartDirection = state.get(BedBlock.PART) == BedPart.FOOT ? bedPosDirection : bedPosDirection.getOpposite();
 
             // expand by one in all positive directions as this side will be excluded when picking a random spot
-            return new AxisAlignedBB(bedPos, bedPos.offset(otherPartDirection)).grow(this.spawnMonsterRange).expand(1, 1, 1);
+            return new AxisAlignedBB(bedPos, bedPos.offset(otherPartDirection)).grow(this.monsterSpawnRange).expand(1, 1, 1);
         }
 
         return null;
@@ -184,7 +185,7 @@ public class BadDreamElement extends AbstractElement implements ISidedElement.Co
     private Optional<EntityType<?>> getRandomEntity(Random random) {
 
         int weight = (int) (this.spawnableMonsters.values().stream().mapToInt(Integer::intValue).sum() * random.nextDouble());
-        for (Map.Entry<EntityType<?>, Integer> entry : this.spawnableMonsters.entrySet()) {
+        for (Map.Entry<? extends EntityType<?>, Integer> entry : this.spawnableMonsters.entrySet()) {
 
             weight -= entry.getValue();
             if (weight < 0) {
@@ -200,6 +201,7 @@ public class BadDreamElement extends AbstractElement implements ISidedElement.Co
 
         EntitySpawnPlacementRegistry.PlacementType placementType = EntitySpawnPlacementRegistry.getPlacementType(entityType);
         boolean canSpawnAtLocation = WorldEntitySpawner.canCreatureTypeSpawnAtLocation(placementType, world, pos, entityType);
+
         return canSpawnAtLocation && EntitySpawnPlacementRegistry.canSpawnEntity(entityType, world, SpawnReason.EVENT, pos, world.getRandom());
     }
 
@@ -211,7 +213,7 @@ public class BadDreamElement extends AbstractElement implements ISidedElement.Co
         if (path != null && path.getCurrentPathLength() > 1) {
 
             PathPoint pathpoint = path.getFinalPathPoint();
-            if (pathpoint != null && world.isPlayerWithin(pathpoint.x, pathpoint.y, pathpoint.z, this.spawnMonsterRange)) {
+            if (pathpoint != null && world.isPlayerWithin(pathpoint.x, pathpoint.y, pathpoint.z, 1.5)) {
 
                 monster.setAttackTarget(player);
                 return true;
