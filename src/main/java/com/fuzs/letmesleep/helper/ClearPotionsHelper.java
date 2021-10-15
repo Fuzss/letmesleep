@@ -2,6 +2,7 @@ package com.fuzs.letmesleep.helper;
 
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.potion.PotionEffect;
+import net.minecraftforge.event.entity.living.PotionEvent;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -19,8 +20,8 @@ public class ClearPotionsHelper {
 
                 PotionEffect effect = iterator.next();
 
-                boolean flag1 = net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new net.minecraftforge.event.entity.living.PotionEvent.PotionRemoveEvent(entity, effect));
-                boolean flag2 = effect.getPotion().isBeneficial();
+                boolean flag1 = net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new PotionEvent.PotionRemoveEvent(entity, effect));
+                boolean flag2 = !effect.getPotion().isBadEffect();
 
                 if (flag1 || flag2 && !beneficial || !flag2 && beneficial) {
                     continue;

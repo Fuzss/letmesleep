@@ -49,7 +49,7 @@ public class MessageRequestSpawn implements IMessage, IMessageHandler<MessageReq
 
             BlockPos pos = message.getPosition();
 
-            // can actually be null, although the IDE says it won't be, therefor a null check later on
+            // can actually be null, although the IDE says it won't be, therefore a null check later on
             BlockPos spawn = player.getBedLocation(player.dimension);
 
             if (pos.equals(player.world.getSpawnPoint()) && spawn != null) {
